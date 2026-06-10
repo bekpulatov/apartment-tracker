@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from config import PRICE_MIN_USD, PRICE_MAX_USD, REQUIRE_FURNISHED, REQUIRE_PHOTO, MAX_LISTING_AGE_DAYS
 
-# Approximate UZS → USD rate (updated periodically)
+# Approximate UZS → USD rate, used only when the source gives no USD price
 UZS_TO_USD = 1 / 12700
 
 
@@ -11,7 +11,6 @@ def parse_price_usd(price_str: str) -> float | None:
         return None
     price_str = price_str.replace(" ", "").replace("\xa0", "")
 
-    # Try to find a number
     numbers = re.findall(r"[\d]+", price_str.replace(",", ""))
     if not numbers:
         return None
@@ -22,12 +21,13 @@ def parse_price_usd(price_str: str) -> float | None:
         return amount
     if "сум" in lower or "uzs" in lower or "so'm" in lower or "sum" in lower:
         return amount * UZS_TO_USD
-    # default: assume USD if small number, UZS if large
     return amount if amount < 10000 else amount * UZS_TO_USD
 
 
 def passes_price(listing: dict) -> bool:
-    price = parse_price_usd(listing.get("price", ""))
+    price = listing.get("price_usd")
+    if price is None:
+        price = parse_price_usd(listing.get("price", ""))
     if price is None:
         return True  # can't determine, include it
     return PRICE_MIN_USD <= price <= PRICE_MAX_USD
@@ -36,6 +36,9 @@ def passes_price(listing: dict) -> bool:
 def passes_furnished(listing: dict) -> bool:
     if not REQUIRE_FURNISHED:
         return True
+    # Prefer the structured field from the source; fall back to keywords
+    if listing.get("furnished") is not None:
+        return listing["furnished"]
     text = (listing.get("title", "") + " " + listing.get("description", "")).lower()
     keywords = ["меблир", "furnished", "mebel", "мебел"]
     return any(k in text for k in keywords)
@@ -59,7 +62,7 @@ def passes_all(listing: dict) -> tuple[bool, str]:
     if not passes_photo(listing):
         return False, "no photo"
     if not passes_price(listing):
-        price = parse_price_usd(listing.get("price", ""))
+        price = listing.get("price_usd") or parse_price_usd(listing.get("price", ""))
         return False, f"price ${price:.0f} out of range" if price else "price unknown"
     if not passes_furnished(listing):
         return False, "not furnished"
