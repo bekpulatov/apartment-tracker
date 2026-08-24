@@ -1,14 +1,13 @@
 from datetime import datetime, timezone
-import requests
+import json
+from playwright.sync_api import sync_playwright
 from config import ROOMS_MIN
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json",
-    "Accept-Language": "ru-RU,ru;q=0.9",
-}
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-# OLX JSON API — category 1147 = long-term apartment rentals, city 4 = Tashkent
+# OLX puts a bot-detection challenge in front of the raw API — loading the search
+# page first in a real browser session gets us past it before we call the API.
+SEARCH_PAGE_URL = "https://www.olx.uz/nedvizhimost/arenda-kvartir-i-domov-dolgosrochno/tashkent/"
 API_URL = "https://www.olx.uz/api/v1/offers/"
 CATEGORY_ID = 1147
 CITY_ID = 4
@@ -48,68 +47,88 @@ def _extract_price(ad: dict) -> tuple[float | None, str]:
     return None, label
 
 
+def _fetch_page_json(page, offset: int) -> dict:
+    url = f"{API_URL}?offset={offset}&limit={PAGE_SIZE}&category_id={CATEGORY_ID}&city_id={CITY_ID}"
+    result = page.evaluate(
+        """async (url) => {
+            const r = await fetch(url, { headers: { Accept: "application/json" } });
+            return { status: r.status, text: await r.text() };
+        }""",
+        url,
+    )
+    if result["status"] != 200:
+        raise RuntimeError(f"HTTP {result['status']} from OLX API")
+    return json.loads(result["text"])
+
+
 def fetch_listings(max_pages: int = 3) -> list[dict]:
     listings = []
     seen_ids = set()
     try:
-        for page in range(max_pages):
-            r = requests.get(API_URL, headers=HEADERS, timeout=15, params={
-                "offset": page * PAGE_SIZE,
-                "limit": PAGE_SIZE,
-                "category_id": CATEGORY_ID,
-                "city_id": CITY_ID,
-            })
-            ads = r.json().get("data", [])
-            if not ads:
-                break
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            try:
+                context = browser.new_context(user_agent=USER_AGENT, locale="ru-RU")
+                page = context.new_page()
+                # Establishes the session/cookies OLX's bot-detection expects before the API will respond.
+                page.goto(SEARCH_PAGE_URL, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(2000)
 
-            for ad in ads:
-                if ad["id"] in seen_ids:
-                    continue
-                seen_ids.add(ad["id"])
+                for page_num in range(max_pages):
+                    data = _fetch_page_json(page, page_num * PAGE_SIZE)
+                    ads = data.get("data", [])
+                    if not ads:
+                        break
 
-                if ad.get("location", {}).get("city", {}).get("id") != CITY_ID:
-                    continue
+                    for ad in ads:
+                        if ad["id"] in seen_ids:
+                            continue
+                        seen_ids.add(ad["id"])
 
-                rooms = _get_param(ad, "number_of_rooms")
-                rooms_key = rooms.get("key") if isinstance(rooms, dict) else rooms
-                if rooms_key:
-                    key_str = str(rooms_key).strip()
-                    # Non-numeric keys like "4+" already satisfy any realistic minimum
-                    if key_str.isdigit() and int(key_str) < ROOMS_MIN:
-                        continue
+                        if ad.get("location", {}).get("city", {}).get("id") != CITY_ID:
+                            continue
 
-                price_usd, price_str = _extract_price(ad)
+                        rooms = _get_param(ad, "number_of_rooms")
+                        rooms_key = rooms.get("key") if isinstance(rooms, dict) else rooms
+                        if rooms_key:
+                            key_str = str(rooms_key).strip()
+                            # Non-numeric keys like "4+" already satisfy any realistic minimum
+                            if key_str.isdigit() and int(key_str) < ROOMS_MIN:
+                                continue
 
-                photos = ad.get("photos", [])
-                image_url = None
-                if photos:
-                    image_url = photos[0].get("link", "").replace("{width}", "800").replace("{height}", "600")
+                        price_usd, price_str = _extract_price(ad)
 
-                furnished_val = _get_param(ad, "furnished")
-                furnished_key = furnished_val.get("key") if isinstance(furnished_val, dict) else furnished_val
+                        photos = ad.get("photos", [])
+                        image_url = None
+                        if photos:
+                            image_url = photos[0].get("link", "").replace("{width}", "800").replace("{height}", "600")
 
-                loc = ad.get("location", {})
-                district = loc.get("district", {}).get("name", "")
-                address = ", ".join(x for x in [loc.get("city", {}).get("name", ""), district] if x)
+                        furnished_val = _get_param(ad, "furnished")
+                        furnished_key = furnished_val.get("key") if isinstance(furnished_val, dict) else furnished_val
 
-                listings.append({
-                    "id": f"olx_{ad['id']}",
-                    "source": "OLX.uz",
-                    "title": ad.get("title", ""),
-                    "price": price_str,
-                    "price_usd": price_usd,
-                    "url": ad.get("url", ""),
-                    "image_url": image_url,
-                    "address": address or "Tashkent",
-                    "description": ad.get("description", ""),
-                    "furnished": furnished_key == "yes" if furnished_key is not None else None,
-                    # created_time = when the listing was actually posted.
-                    # Never use last_refresh_time: paying for promotion bumps it.
-                    "posted_at": _parse_date(ad.get("created_time")),
-                    "lat": ad.get("map", {}).get("lat"),
-                    "lon": ad.get("map", {}).get("lon"),
-                })
+                        loc = ad.get("location", {})
+                        district = loc.get("district", {}).get("name", "")
+                        address = ", ".join(x for x in [loc.get("city", {}).get("name", ""), district] if x)
+
+                        listings.append({
+                            "id": f"olx_{ad['id']}",
+                            "source": "OLX.uz",
+                            "title": ad.get("title", ""),
+                            "price": price_str,
+                            "price_usd": price_usd,
+                            "url": ad.get("url", ""),
+                            "image_url": image_url,
+                            "address": address or "Tashkent",
+                            "description": ad.get("description", ""),
+                            "furnished": furnished_key == "yes" if furnished_key is not None else None,
+                            # created_time = when the listing was actually posted.
+                            # Never use last_refresh_time: paying for promotion bumps it.
+                            "posted_at": _parse_date(ad.get("created_time")),
+                            "lat": ad.get("map", {}).get("lat"),
+                            "lon": ad.get("map", {}).get("lon"),
+                        })
+            finally:
+                browser.close()
 
     except Exception as e:
         print(f"[OLX] Error: {e}")
