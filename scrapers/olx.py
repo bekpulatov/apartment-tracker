@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import requests
+from config import ROOMS_MIN
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -72,8 +73,11 @@ def fetch_listings(max_pages: int = 3) -> list[dict]:
 
                 rooms = _get_param(ad, "number_of_rooms")
                 rooms_key = rooms.get("key") if isinstance(rooms, dict) else rooms
-                if rooms_key and str(rooms_key).strip() != "1":
-                    continue
+                if rooms_key:
+                    key_str = str(rooms_key).strip()
+                    # Non-numeric keys like "4+" already satisfy any realistic minimum
+                    if key_str.isdigit() and int(key_str) < ROOMS_MIN:
+                        continue
 
                 price_usd, price_str = _extract_price(ad)
 

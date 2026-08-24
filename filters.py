@@ -58,6 +58,18 @@ def passes_recency(listing: dict) -> bool:
     return posted_at >= cutoff
 
 
+BONFIRE_KEYWORDS = [
+    "двор", "участок", "частный дом", "приусадебн", "мангал", "костер", "костёр",
+    "yard", "garden", "backyard", "private house",
+]
+
+
+def has_bonfire_space(listing: dict) -> bool:
+    """Bonus signal only — never used to filter listings out."""
+    text = (listing.get("title", "") + " " + listing.get("description", "")).lower()
+    return any(k in text for k in BONFIRE_KEYWORDS)
+
+
 def passes_all(listing: dict) -> tuple[bool, str]:
     if not passes_photo(listing):
         return False, "no photo"

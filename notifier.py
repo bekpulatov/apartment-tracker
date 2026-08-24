@@ -15,11 +15,17 @@ async def _send(text: str, image_url: str | None):
 
 
 def notify(listing: dict):
-    text = (
-        f"🏠 <b>New apartment found!</b>\n\n"
-        f"<b>{listing['title']}</b>\n"
-        f"💰 {listing['price']}\n"
-        f"📍 {listing['address']}\n"
-        f"🔗 <a href=\"{listing['url']}\">View listing ({listing['source']})</a>"
-    )
+    lines = [
+        "🏠 <b>New apartment found!</b>\n",
+        f"<b>{listing['title']}</b>",
+        f"💰 {listing['price']}",
+        f"📍 {listing['address']}",
+    ]
+    if listing.get("walk_minutes") is not None:
+        lines.append(f"🚶 ~{listing['walk_minutes']} min walk from home")
+    if listing.get("bonfire"):
+        lines.append("🔥 Might have bonfire space (yard/private house mentioned)")
+    lines.append(f"🔗 <a href=\"{listing['url']}\">View listing ({listing['source']})</a>")
+
+    text = "\n".join(lines)
     asyncio.run(_send(text, listing.get("image_url")))

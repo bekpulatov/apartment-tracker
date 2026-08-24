@@ -1,9 +1,9 @@
 import time
 import schedule
 from db import init_db, is_seen, mark_seen
-from location import is_within_radius
+from location import is_within_radius, distance_km, walk_minutes
 from notifier import notify
-from filters import passes_all
+from filters import passes_all, has_bonfire_space
 from scrapers import olx, uybor
 from config import CHECK_INTERVAL_MINUTES
 
@@ -27,6 +27,9 @@ def check():
             print(f"  [skip] Too far: {listing['title']}")
             mark_seen(listing)
             continue
+
+        listing["walk_minutes"] = walk_minutes(distance_km(listing["lat"], listing["lon"]))
+        listing["bonfire"] = has_bonfire_space(listing)
 
         print(f"  [NEW] {listing['title']} — {listing['price']}")
         notify(listing)

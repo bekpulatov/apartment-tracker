@@ -13,9 +13,12 @@ DB_PATH = "listings.db"
 
 # Price filter (USD/month)
 PRICE_MIN_USD = 300
-PRICE_MAX_USD = 700
+PRICE_MAX_USD = 1500
 
 # Listing filters
 REQUIRE_FURNISHED = True
 REQUIRE_PHOTO = True
 MAX_LISTING_AGE_DAYS = 3
+
+# Need at least a bedroom + a separate room to work from
+ROOMS_MIN = 2
