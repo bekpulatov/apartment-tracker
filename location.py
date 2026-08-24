@@ -1,8 +1,9 @@
 from geopy.distance import geodesic
-from config import RADIUS_KM
+from config import RADIUS_KM, HOME_LAT, HOME_LON
 
-# Taras Shevchenko 40, Tashkent
-HOME_COORDS = (41.2962964, 69.2812385)
+if not HOME_LAT or not HOME_LON:
+    raise RuntimeError("HOME_LAT and HOME_LON must be set (see .env.example)")
+HOME_COORDS = (float(HOME_LAT), float(HOME_LON))
 
 WALK_SPEED_KMH = 4.5
 

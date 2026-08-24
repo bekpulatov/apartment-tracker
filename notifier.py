@@ -16,7 +16,7 @@ async def _send(text: str, image_url: str | None):
 
 def notify(listing: dict):
     lines = [
-        "🏠 <b>New apartment found!</b>\n",
+        "🏠 <b>New place found!</b>\n",
         f"<b>{listing['title']}</b>",
         f"💰 {listing['price']}",
         f"📍 {listing['address']}",

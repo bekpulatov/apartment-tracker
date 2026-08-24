@@ -9,6 +9,7 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 # page first in a real browser session gets us past it before we call the API.
 SEARCH_PAGE_URL = "https://www.olx.uz/nedvizhimost/arenda-kvartir-i-domov-dolgosrochno/tashkent/"
 API_URL = "https://www.olx.uz/api/v1/offers/"
+# Category 1147 = long-term rentals, apartments and houses combined (OLX doesn't split them)
 CATEGORY_ID = 1147
 CITY_ID = 4
 PAGE_SIZE = 40

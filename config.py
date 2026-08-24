@@ -8,6 +8,9 @@ RADIUS_KM = 3.0
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+HOME_LAT = os.getenv("HOME_LAT")
+HOME_LON = os.getenv("HOME_LON")
+
 CHECK_INTERVAL_MINUTES = 30
 DB_PATH = "listings.db"
 
