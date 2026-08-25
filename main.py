@@ -32,8 +32,10 @@ def check():
         listing["bonfire"] = has_bonfire_space(listing)
 
         print(f"  [NEW] {listing['title']} — {listing['price']}")
-        notify(listing)
+        # Mark seen before notifying: if the run gets interrupted mid-notify, we'd
+        # rather silently miss one listing than spam a duplicate on the next run.
         mark_seen(listing)
+        notify(listing)
         new_count += 1
 
     print(f"[Tracker] Done. {new_count} new listing(s) sent.")

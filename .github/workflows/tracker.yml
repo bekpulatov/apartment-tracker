@@ -5,6 +5,12 @@ on:
     - cron: '*/30 * * * *'   # every 30 minutes
   workflow_dispatch:           # allow manual run from GitHub UI
 
+# Two overlapping runs would both restore the same "seen listings" cache and independently
+# think a listing is new, sending duplicate Telegram messages. Queue instead of running in parallel.
+concurrency:
+  group: apartment-tracker
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
