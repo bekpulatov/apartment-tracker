@@ -21,7 +21,7 @@ PRICE_MAX_USD = 1500
 # Listing filters
 REQUIRE_FURNISHED = True
 REQUIRE_PHOTO = True
-MAX_LISTING_AGE_DAYS = 3
+MAX_LISTING_AGE_DAYS = 1
 
 # Need at least a bedroom + a separate room to work from
 ROOMS_MIN = 2
