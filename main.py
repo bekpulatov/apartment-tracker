@@ -3,14 +3,14 @@ import schedule
 from db import init_db, is_seen, mark_seen
 from location import is_within_radius, distance_km, walk_minutes
 from notifier import notify
-from filters import passes_all, has_bonfire_space
-from scrapers import olx, uybor, bali_home_immo
+from filters import passes_all
+from scrapers import olx_office
 from config import CHECK_INTERVAL_MINUTES
 
 
 def check():
     print(f"[Tracker] Checking for new listings...")
-    all_listings = olx.fetch_listings() + uybor.fetch_listings() + bali_home_immo.fetch_listings()
+    all_listings = olx_office.fetch_listings()
     new_count = 0
 
     for listing in all_listings:
@@ -23,16 +23,11 @@ def check():
             mark_seen(listing)
             continue
 
-        # The walkable-radius requirement is specific to the Tashkent/home search —
-        # Bali listings are already scoped to Uluwatu by the scraper's own query.
-        if listing.get("market") != "bali_uluwatu":
-            if not is_within_radius(listing["lat"], listing["lon"]):
-                print(f"  [skip] Too far: {listing['title']}")
-                mark_seen(listing)
-                continue
-            listing["walk_minutes"] = walk_minutes(distance_km(listing["lat"], listing["lon"]))
-
-        listing["bonfire"] = has_bonfire_space(listing)
+        if not is_within_radius(listing["lat"], listing["lon"]):
+            print(f"  [skip] Too far: {listing['title']}")
+            mark_seen(listing)
+            continue
+        listing["walk_minutes"] = walk_minutes(distance_km(listing["lat"], listing["lon"]))
 
         print(f"  [NEW] {listing['title']} — {listing['price']}")
         # Mark seen before notifying: if the run gets interrupted mid-notify, we'd

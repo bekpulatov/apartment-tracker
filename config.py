@@ -19,9 +19,12 @@ PRICE_MIN_USD = 300
 PRICE_MAX_USD = 1500
 
 # Listing filters
-REQUIRE_FURNISHED = True
+# OLX doesn't track a "furnished" attribute for commercial/office premises at all,
+# so this must stay off while the tracker is searching offices, not apartments.
+REQUIRE_FURNISHED = False
 REQUIRE_PHOTO = True
 MAX_LISTING_AGE_DAYS = 1
 
-# Need at least a bedroom + a separate room to work from
+# Unused while searching offices (a whole office unit IS the workspace) — kept
+# for the dormant apartment/villa scrapers, which still import this.
 ROOMS_MIN = 2
